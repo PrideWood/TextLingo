@@ -15,9 +15,10 @@ import type { AnalysisResult, DifficultyRating, Language, UiLanguage } from '../
 import { ExportPage } from './ExportPage';
 import { ExpressionsPage, GrammarPage, VocabularyPage } from './KnowledgeCategoryPage';
 import { OriginalTranslationPage } from './OriginalTranslationPage';
-import { QuizPage } from './QuizPage';
+import { QuizPage, type QuizWorkState } from './QuizPage';
 import { StudyOutline, type StudyNavItem } from './StudyOutline';
 import { StudyPageFrame } from './StudyPageFrame';
+import { getEffectiveQuizType } from './studyUtils';
 
 interface StudyWorkspaceProps {
   sourceText: string;
@@ -38,13 +39,22 @@ const navItemsBase: Array<Omit<StudyNavItem, 'label'> & { label: Record<UiLangua
 ];
 
 export function StudyWorkspace({ sourceText, result, sourceLanguage, targetLanguage, uiLanguage }: StudyWorkspaceProps) {
-  const navItems = useMemo(() => navItemsBase.map((item) => ({ ...item, label: item.label[uiLanguage] })), [uiLanguage]);
+  const knowledge = useMemo(() => result.knowledge ?? { vocabulary: [], expressions: [], grammar: [] }, [result.knowledge]);
+  const quiz = useMemo(() => result.quiz ?? [], [result.quiz]);
+  const navItems = useMemo(
+    () =>
+      navItemsBase.map((item) => ({
+        ...item,
+        label: item.label[uiLanguage],
+        children: getNavChildren(item.id, knowledge, quiz, uiLanguage),
+      })),
+    [knowledge, quiz, uiLanguage],
+  );
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [visited, setVisited] = useState<Set<string>>(() => new Set(['overview']));
+  const [quizState, setQuizState] = useState<QuizWorkState>({ choiceAnswers: {}, textAnswers: {}, submitted: false });
 
   const title = result.title?.trim() || 'Untitled Language Note';
-  const knowledge = result.knowledge ?? { vocabulary: [], expressions: [], grammar: [] };
-  const quiz = result.quiz ?? [];
   const markdown = useMemo(
     () => buildMarkdownExport({ title, sourceText, result, sourceLanguage, targetLanguage }),
     [result, sourceLanguage, sourceText, targetLanguage, title],
@@ -71,11 +81,20 @@ export function StudyWorkspace({ sourceText, result, sourceLanguage, targetLangu
 
   const goPrevious = () => setCurrentPageIndex((index) => Math.max(index - 1, 0));
   const goNext = () => setCurrentPageIndex((index) => Math.min(index + 1, navItems.length - 1));
+  const handleSelectNav = (index: number, targetId?: string) => {
+    setCurrentPageIndex(index);
+
+    if (targetId) {
+      window.setTimeout(() => {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    }
+  };
   const current = navItems[currentPageIndex];
 
   return (
     <section className="flex flex-col gap-4 lg:h-[calc(100vh-128px)] lg:min-h-[680px] lg:flex-row">
-      <StudyOutline items={navItems} currentIndex={currentPageIndex} visited={visited} onSelect={setCurrentPageIndex} />
+      <StudyOutline items={navItems} currentIndex={currentPageIndex} visited={visited} onSelect={handleSelectNav} />
 
       <div className="min-w-0 flex-1">
         <StudyPageFrame
@@ -103,11 +122,11 @@ export function StudyWorkspace({ sourceText, result, sourceLanguage, targetLangu
             />
           ) : null}
 
-          {current.id === 'compare' ? <OriginalTranslationPage sourceText={sourceText} translation={result.translation} /> : null}
+          {current.id === 'compare' ? <OriginalTranslationPage sourceText={sourceText} translation={result.translation} vocabulary={knowledge.vocabulary} /> : null}
           {current.id === 'vocabulary' ? <VocabularyPage items={knowledge.vocabulary} /> : null}
           {current.id === 'expressions' ? <ExpressionsPage items={knowledge.expressions} /> : null}
           {current.id === 'grammar' ? <GrammarPage items={knowledge.grammar} /> : null}
-          {current.id === 'quiz' ? <QuizPage questions={quiz} sourceLanguage={sourceLanguage} /> : null}
+          {current.id === 'quiz' ? <QuizPage questions={quiz} sourceLanguage={sourceLanguage} state={quizState} onChange={setQuizState} /> : null}
           {current.id === 'export' ? (
             <ExportPage title={title} markdown={markdown} translation={result.translation} knowledge={knowledge} quiz={quiz} uiLanguage={uiLanguage} />
           ) : null}
@@ -115,6 +134,42 @@ export function StudyWorkspace({ sourceText, result, sourceLanguage, targetLangu
       </div>
     </section>
   );
+}
+
+function getNavChildren(pageId: string, knowledge: AnalysisResult['knowledge'], quiz: AnalysisResult['quiz'], uiLanguage: UiLanguage) {
+  if (pageId === 'vocabulary') {
+    return knowledge.vocabulary
+      .map((item, index) => ({
+        label: item.term || item.name || '',
+        targetId: `vocabulary-item-${index}`,
+      }))
+      .filter((child) => child.label);
+  }
+  if (pageId === 'expressions') {
+    return knowledge.expressions
+      .map((item, index) => ({
+        label: item.term || item.name || '',
+        targetId: `expressions-item-${index}`,
+      }))
+      .filter((child) => child.label);
+  }
+  if (pageId === 'grammar') {
+    return knowledge.grammar
+      .map((item, index) => ({
+        label: item.term || item.name || '',
+        targetId: `grammar-item-${index}`,
+      }))
+      .filter((child) => child.label);
+  }
+  if (pageId === 'quiz') {
+    const types = new Set(quiz.map(getEffectiveQuizType));
+    const children = [];
+    if (types.has('single')) children.push({ label: uiLanguage === 'zh' ? '单选题' : 'Single choice', targetId: 'quiz-section-single' });
+    if (types.has('multiple')) children.push({ label: uiLanguage === 'zh' ? '多选题' : 'Multiple choice', targetId: 'quiz-section-multiple' });
+    if (types.has('translation')) children.push({ label: uiLanguage === 'zh' ? '翻译题' : 'Translation recall', targetId: 'quiz-section-translation' });
+    return children;
+  }
+  return [];
 }
 
 function OverviewPage({

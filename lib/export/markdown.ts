@@ -21,7 +21,7 @@ function quizSectionMarkdown(typeLabel: string, questions: QuizQuestion[]) {
   questions.forEach((question, index) => {
     lines.push(`${index + 1}. ${question.question}`);
     question.options.forEach((option) => lines.push(`   - ${option}`));
-    lines.push(`   - 正确答案：${question.answer.join('、')}`);
+    lines.push(`   - ${question.type === 'translation' ? '原文答案' : '正确答案'}：${question.answer.join('、')}`);
     lines.push(`   - 解析：${question.explanation}`);
   });
 
@@ -78,8 +78,10 @@ export function buildMarkdownExport(params: {
   sections.push('', '## 练习题');
   const single = result.quiz?.filter((question) => question.type === 'single') ?? [];
   const multiple = result.quiz?.filter((question) => question.type === 'multiple') ?? [];
+  const translation = result.quiz?.filter((question) => question.type === 'translation') ?? [];
   sections.push(single.length ? quizSectionMarkdown('单选题', single) : '### 单选题\n暂无');
   sections.push('', multiple.length ? quizSectionMarkdown('多选题', multiple) : '### 多选题\n暂无');
+  sections.push('', translation.length ? quizSectionMarkdown('翻译题', translation) : '### 翻译题\n暂无');
 
   return sections.join('\n');
 }

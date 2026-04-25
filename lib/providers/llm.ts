@@ -131,8 +131,66 @@ function extractChatCompletionText(payload: ChatCompletionsResponse): string {
 export function extractJson<T>(rawText: string): T {
   const trimmed = rawText.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const candidate = fenced ? fenced[1] : trimmed;
+  const candidate = extractJsonCandidate(fenced ? fenced[1] : trimmed);
   return JSON.parse(candidate) as T;
+}
+
+function extractJsonCandidate(text: string) {
+  const trimmed = text.trim();
+  const firstObject = trimmed.indexOf('{');
+  const lastObject = trimmed.lastIndexOf('}');
+  const firstArray = trimmed.indexOf('[');
+  const lastArray = trimmed.lastIndexOf(']');
+
+  const objectCandidate =
+    firstObject >= 0 && lastObject > firstObject ? trimmed.slice(firstObject, lastObject + 1) : '';
+  const arrayCandidate =
+    firstArray >= 0 && lastArray > firstArray ? trimmed.slice(firstArray, lastArray + 1) : '';
+
+  if (!objectCandidate) return arrayCandidate || trimmed;
+  if (!arrayCandidate) return objectCandidate;
+
+  return firstObject < firstArray ? objectCandidate : arrayCandidate;
+}
+
+export async function requestLlmJson<T>(params: Omit<Parameters<typeof requestLlmText>[0], 'expectJson'>): Promise<T> {
+  const rawText = await requestLlmText({ ...params, expectJson: true });
+
+  try {
+    return extractJson<T>(rawText);
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[provider:${params.feature}] json parse failed; requesting repair`, {
+        message: error instanceof Error ? error.message : 'unknown error',
+        rawPreview: rawText.slice(0, 160),
+      });
+    }
+
+    const repairedText = await requestLlmText({
+      prefixes: params.prefixes,
+      feature: `${params.feature}:json-repair`,
+      fallbackModel: params.fallbackModel,
+      expectJson: true,
+      systemPrompt:
+        'You repair malformed JSON. Return valid JSON only. Do not add markdown fences or explanation. Preserve the original meaning and field names. Escape all line breaks inside JSON string values as \\n.',
+      userPrompt: [
+        'The following model output was intended to be JSON but is invalid.',
+        'Repair it into valid JSON only. Preserve all values as much as possible.',
+        'Important: the source text may contain blank lines. Blank lines are allowed, but JSON string values must not contain raw line breaks; escape them as \\n.',
+        error instanceof Error ? `Parser error: ${error.message}` : null,
+        'Invalid JSON-like text:',
+        rawText.slice(0, 30000),
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+
+    try {
+      return extractJson<T>(repairedText);
+    } catch {
+      throw new Error(`${params.feature}结果不是有效 JSON，请重新分析一次`);
+    }
+  }
 }
 
 export async function requestLlmText(params: {

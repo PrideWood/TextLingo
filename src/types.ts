@@ -38,7 +38,7 @@ export interface KnowledgeResult {
   grammar: KnowledgeItem[];
 }
 
-export type QuizType = 'single' | 'multiple';
+export type QuizType = 'single' | 'multiple' | 'translation';
 
 export interface QuizQuestion {
   id: string;
@@ -70,6 +70,7 @@ export type KnowledgeDetailLevel = 'basic' | 'medium' | 'advanced';
 export interface QuizQuestionTypes {
   single: boolean;
   multiple: boolean;
+  translation: boolean;
 }
 
 export interface AnalysisOptions {

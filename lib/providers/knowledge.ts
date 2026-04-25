@@ -1,5 +1,5 @@
 import type { KnowledgeDetailLevel, KnowledgeItem, KnowledgeSection } from '../../src/types';
-import { extractJson, hasLlmCredentials, requestLlmText } from './llm';
+import { hasLlmCredentials, requestLlmJson } from './llm';
 
 export interface KnowledgeProviderInput {
   text: string;
@@ -49,16 +49,16 @@ function normalizeKnowledgeItem(item: KnowledgeItem): KnowledgeItem {
 
 export async function extractKnowledge(input: KnowledgeProviderInput): Promise<KnowledgeSection[]> {
   const detailLevel = input.detailLevel ?? 'medium';
-  const rawText = await requestLlmText({
+  const payload = await requestLlmJson<KnowledgePayload>({
     prefixes: ['KNOWLEDGE', 'TRANSLATE'],
     feature: 'knowledge',
-    expectJson: true,
     userPrompt: [
       `Source language: ${input.sourceLanguage}`,
       `Target language: ${input.targetLanguage}`,
       input.title?.trim() ? `Title: ${input.title.trim()}` : null,
       `Knowledge detail level: ${detailLevel}`,
       'Analyze the following text and return json only.',
+      'The input text may contain blank lines. Blank lines are allowed in the source input, but every JSON string value must escape line breaks as \\n. Never put raw line breaks inside a JSON string.',
       'Return exactly this shape:',
       '{"sections":[{"title":"重点词汇","intro":"...","items":[{"id":"v1","term":"source term exactly as written","explanation":"...","sourceSnippet":"complete source sentence whenever possible","note":"..."}]},{"title":"常用表达","intro":"...","items":[{"id":"e1","term":"source expression exactly as written","explanation":"...","sourceSnippet":"complete source sentence whenever possible","note":"..."}]},{"title":"语法点","intro":"...","items":[{"id":"g1","term":"source-language grammar pattern or structure","explanation":"...","sourceSnippet":"complete source sentence whenever possible","note":"..."}]}]}',
       'KnowledgeItem contract:',
@@ -72,6 +72,7 @@ export async function extractKnowledge(input: KnowledgeProviderInput): Promise<K
       '- Grammar: term may be a target-language label plus the exact source-language structure, for example "条件句: If + subject + did not..."; sourceSnippet must include the complete original sentence.',
       'Language contract: termLanguage = sourceLanguage; sourceSnippetLanguage = sourceLanguage; explanationLanguage = targetLanguage; noteLanguage = targetLanguage.',
       'For each item, provide a complete source sentence from the original text whenever possible. Avoid one-word or broken fragments as sourceSnippet.',
+      'If a sourceSnippet spans multiple lines, either choose the most relevant complete sentence or encode the line break as \\n inside the JSON string.',
       knowledgeDetailInstruction(detailLevel),
       'Return the three main sections: 重点词汇, 常用表达, 语法点. The number and selection of items must follow Knowledge detail level.',
       'Text:',
@@ -83,7 +84,6 @@ export async function extractKnowledge(input: KnowledgeProviderInput): Promise<K
       'You are a language learning assistant. Return valid json only. Do not add markdown fences or extra explanation.',
   });
 
-  const payload = extractJson<KnowledgePayload>(rawText);
   return normalizeKnowledgePayload(payload);
 }
 

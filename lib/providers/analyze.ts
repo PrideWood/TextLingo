@@ -14,7 +14,7 @@ import { generateTitle, hasTitleCredentials } from './title';
 import { translateText, hasTranslateCredentials } from './translate';
 import { extractKnowledge, hasKnowledgeCredentials } from './knowledge';
 import { generateQuiz, hasQuizCredentials } from './quiz';
-import { extractJson, requestLlmText } from './llm';
+import { requestLlmJson } from './llm';
 
 export interface AnalyzeProviderInput {
   text: string;
@@ -48,6 +48,7 @@ const defaultAnalyzeOptions: AnalysisOptions = {
   quizQuestionTypes: {
     single: true,
     multiple: true,
+    translation: true,
   },
 };
 
@@ -122,16 +123,16 @@ export function normalizeAnalysisResult(
 }
 
 async function rateDifficulty(input: AnalyzeProviderInput): Promise<DifficultyRating | null> {
-  const rawText = await requestLlmText({
+  const payload = await requestLlmJson<DifficultyPayload>({
     prefixes: ['TITLE', 'TRANSLATE'],
     feature: 'difficulty',
-    expectJson: true,
     systemPrompt:
       'You rate language-learning text difficulty. Return valid json only. Do not add markdown fences or extra explanation.',
     userPrompt: [
       `Source language: ${input.sourceLanguage}`,
       `Target language: ${input.targetLanguage}`,
       'Analyze the text difficulty for a language learner and return json only.',
+      'The input text may contain blank lines. Preserve that meaning, but every JSON string value must escape line breaks as \\n. Do not put raw line breaks inside JSON strings.',
       'Difficulty rating rules:',
       '- 1 star: A1-A2, simple daily expressions, short sentences, basic vocabulary.',
       '- 2 stars: A2-B1, elementary to lower-intermediate, a few complex expressions.',
@@ -149,7 +150,6 @@ async function rateDifficulty(input: AnalyzeProviderInput): Promise<DifficultyRa
     ].join('\n'),
   });
 
-  const payload = extractJson<DifficultyPayload>(rawText);
   return normalizeDifficulty(payload.difficulty);
 }
 
@@ -160,7 +160,7 @@ export function normalizeAnalyzeOptions(value: unknown): AnalysisOptions {
     ...(raw.quizQuestionTypes ?? {}),
   };
 
-  if (!questionTypes.single && !questionTypes.multiple) {
+  if (!questionTypes.single && !questionTypes.multiple && !questionTypes.translation) {
     questionTypes.single = true;
   }
 

@@ -18,6 +18,7 @@ export const defaultPreferences: AppPreferences = {
   quizQuestionTypes: {
     single: true,
     multiple: true,
+    translation: true,
   },
   obsidian: {
     enableObsidianExport: true,
@@ -64,7 +65,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
     ...(raw.quizQuestionTypes ?? {}),
   };
 
-  if (!quizQuestionTypes.single && !quizQuestionTypes.multiple) {
+  if (!quizQuestionTypes.single && !quizQuestionTypes.multiple && !quizQuestionTypes.translation) {
     quizQuestionTypes.single = true;
   }
 

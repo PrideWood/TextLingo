@@ -1,5 +1,5 @@
 import type { QuizQuestion, QuizQuestionTypes, QuizType } from '../../src/types';
-import { extractJson, hasLlmCredentials, requestLlmText } from './llm';
+import { hasLlmCredentials, requestLlmJson } from './llm';
 
 export interface QuizProviderInput {
   text: string;
@@ -24,7 +24,7 @@ function normalizeQuizPayload(payload: QuizPayload, questionTypes: QuizQuestionT
 
   return payload.questions
     .map((question, index) => {
-      const type: QuizType = question.type === 'multiple' ? 'multiple' : 'single';
+      const type: QuizType = question.type === 'translation' ? 'translation' : question.type === 'multiple' ? 'multiple' : 'single';
       return {
         id: String(question.id || `quiz-${index + 1}`),
         type,
@@ -39,25 +39,28 @@ function normalizeQuizPayload(payload: QuizPayload, questionTypes: QuizQuestionT
 
 export async function generateQuiz(input: QuizProviderInput): Promise<QuizQuestion[]> {
   const questionTypes = normalizeQuestionTypes(input.questionTypes);
-  const rawText = await requestLlmText({
+  const payload = await requestLlmJson<QuizPayload>({
     prefixes: ['QUIZ'],
     feature: 'quiz',
-    expectJson: true,
     userPrompt: [
       `Source language: ${input.sourceLanguage}`,
       `Target language: ${input.targetLanguage}`,
       input.title?.trim() ? `Title: ${input.title.trim()}` : null,
       quizTypeInstruction(questionTypes),
-      'Create 4 study questions based on the text and return json only.',
+      'Create study questions based on the text and return json only.',
+      'The input text may contain blank lines. Blank lines are allowed in the source input, but every JSON string value must escape line breaks as \\n. Never put raw line breaks inside a JSON string.',
       'Return exactly this shape:',
-      '{"questions":[{"id":"q1","type":"single","question":"...","options":["A","B","C","D"],"answer":["A"],"explanation":"..."},{"id":"q2","type":"multiple","question":"...","options":["A","B","C","D"],"answer":["A","C"],"explanation":"..."}]}',
+      '{"questions":[{"id":"q1","type":"single","question":"...","options":["option text","option text","option text","option text"],"answer":["exact option text"],"explanation":"..."},{"id":"q2","type":"multiple","question":"...","options":["option text","option text","option text","option text"],"answer":["exact option text","exact option text"],"explanation":"..."},{"id":"q3","type":"translation","question":"translated sentence in target language","options":[],"answer":["original source sentence"],"explanation":"..."}]}',
       'Requirements:',
       '- The returned type field must match the allowed quiz question types.',
-      '- each question must have exactly 4 options',
-      '- Generate quiz questions and options in the source language.',
+      '- single and multiple choice questions must have exactly 4 options',
+      '- translation questions must have an empty options array',
+      '- Generate single/multiple quiz questions and options in the source language.',
+      '- For translation questions: excerpt at least two complete source sentences from the text, translate each sentence into the target language as the question, and put the exact original source sentence in answer[0].',
       '- Language contract: quizLanguage = sourceLanguage; explanationLanguage = targetLanguage.',
+      '- Translation question prompt language = targetLanguage; translation answer language = sourceLanguage.',
       '- explanation should be concise and written in the target language',
-      '- answers must exactly match option strings',
+      '- for single/multiple choice, answers must exactly match option strings',
       '- do not translate question text or options into the target language unless sourceLanguage and targetLanguage are the same',
       'Text:',
       input.text,
@@ -68,7 +71,6 @@ export async function generateQuiz(input: QuizProviderInput): Promise<QuizQuesti
       'You are a language learning assistant. Return valid json only. Do not add markdown fences or extra explanation.',
   });
 
-  const payload = extractJson<QuizPayload>(rawText);
   return normalizeQuizPayload(payload, questionTypes);
 }
 
@@ -76,9 +78,10 @@ function normalizeQuestionTypes(value?: QuizQuestionTypes): QuizQuestionTypes {
   const questionTypes = {
     single: value?.single ?? true,
     multiple: value?.multiple ?? true,
+    translation: value?.translation ?? true,
   };
 
-  if (!questionTypes.single && !questionTypes.multiple) {
+  if (!questionTypes.single && !questionTypes.multiple && !questionTypes.translation) {
     questionTypes.single = true;
   }
 
@@ -86,27 +89,24 @@ function normalizeQuestionTypes(value?: QuizQuestionTypes): QuizQuestionTypes {
 }
 
 function quizTypeInstruction(questionTypes: QuizQuestionTypes) {
-  if (questionTypes.single && questionTypes.multiple) {
-    return [
-      'Quiz type rules:',
-      '- Generate a mix of single-choice and multiple-choice questions.',
-      '- Use type: "single" for single-choice questions and type: "multiple" for multiple-choice questions.',
-    ].join('\n');
-  }
-
-  if (questionTypes.single) {
-    return [
-      'Quiz type rules:',
-      '- Generate only single-choice questions.',
-      '- Do not generate multiple-choice questions.',
-      '- Every question must use type: "single".',
-    ].join('\n');
-  }
-
+  const allowed = [
+    questionTypes.single ? 'single' : null,
+    questionTypes.multiple ? 'multiple' : null,
+    questionTypes.translation ? 'translation' : null,
+  ].filter(Boolean);
+  const blocked = [
+    !questionTypes.single ? 'single' : null,
+    !questionTypes.multiple ? 'multiple' : null,
+    !questionTypes.translation ? 'translation' : null,
+  ].filter(Boolean);
   return [
     'Quiz type rules:',
-    '- Generate only multiple-choice questions.',
-    '- Do not generate single-choice questions.',
-    '- Every question must use type: "multiple".',
-  ].join('\n');
+    `- Allowed question types: ${allowed.join(', ')}.`,
+    blocked.length ? `- Do not generate these question types: ${blocked.join(', ')}.` : null,
+    questionTypes.single ? '- If single is allowed, generate single-choice questions with type: "single".' : null,
+    questionTypes.multiple ? '- If multiple is allowed, generate multiple-choice questions with type: "multiple".' : null,
+    questionTypes.translation ? '- If translation is allowed, generate at least two translation questions with type: "translation".' : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }

@@ -51,6 +51,7 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
     quizTypes: isZh ? '练习题类型' : 'Quiz question types',
     single: isZh ? '生成单选题' : 'Single choice',
     multiple: isZh ? '生成多选题' : 'Multiple choice',
+    translationQuiz: isZh ? '生成翻译题' : 'Translation recall',
     obsidian: isZh ? 'Obsidian 导出' : 'Obsidian Export',
     obsidianHint: isZh
       ? '需要本机已安装 Obsidian，并且 vault 名称填写正确。'
@@ -73,7 +74,7 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
   };
 
   const save = () => {
-    if (!draft.quizQuestionTypes.single && !draft.quizQuestionTypes.multiple) {
+    if (!draft.quizQuestionTypes.single && !draft.quizQuestionTypes.multiple && !draft.quizQuestionTypes.translation) {
       setDraft(ensureQuestionType(draft));
       setQuizTypeError(isZh ? '至少需要保留一种题型，已自动保留单选题。' : 'At least one question type is required. Single choice was restored.');
       return;
@@ -200,6 +201,7 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
             <div className="flex flex-wrap justify-end gap-3">
               <InlineCheck label={label.single} checked={draft.quizQuestionTypes.single} onChange={(checked) => updateDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, single: checked } })} />
               <InlineCheck label={label.multiple} checked={draft.quizQuestionTypes.multiple} onChange={(checked) => updateDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, multiple: checked } })} />
+              <InlineCheck label={label.translationQuiz} checked={draft.quizQuestionTypes.translation} onChange={(checked) => updateDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, translation: checked } })} />
             </div>
           </SettingRow>
           {quizTypeError ? <p className="px-1 text-xs text-coral">{quizTypeError}</p> : null}
@@ -256,7 +258,7 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
 }
 
 function ensureQuestionType(preferences: AppPreferences): AppPreferences {
-  if (preferences.quizQuestionTypes.single || preferences.quizQuestionTypes.multiple) {
+  if (preferences.quizQuestionTypes.single || preferences.quizQuestionTypes.multiple || preferences.quizQuestionTypes.translation) {
     return preferences;
   }
 
@@ -265,6 +267,7 @@ function ensureQuestionType(preferences: AppPreferences): AppPreferences {
     quizQuestionTypes: {
       single: true,
       multiple: false,
+      translation: false,
     },
   };
 }

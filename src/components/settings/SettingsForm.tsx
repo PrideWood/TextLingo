@@ -152,6 +152,13 @@ export function SettingsForm() {
                   setPreferences(ensureQuestionType({ ...preferences, quizQuestionTypes: { ...preferences.quizQuestionTypes, multiple: checked } }))
                 }
               />
+              <ToggleRow
+                label="Generate translation recall questions"
+                checked={preferences.quizQuestionTypes.translation}
+                onChange={(checked) =>
+                  setPreferences(ensureQuestionType({ ...preferences, quizQuestionTypes: { ...preferences.quizQuestionTypes, translation: checked } }))
+                }
+              />
             </div>
           </div>
 
@@ -165,7 +172,7 @@ export function SettingsForm() {
 }
 
 function ensureQuestionType(preferences: AppPreferences): AppPreferences {
-  if (preferences.quizQuestionTypes.single || preferences.quizQuestionTypes.multiple) {
+  if (preferences.quizQuestionTypes.single || preferences.quizQuestionTypes.multiple || preferences.quizQuestionTypes.translation) {
     return preferences;
   }
 
@@ -174,6 +181,7 @@ function ensureQuestionType(preferences: AppPreferences): AppPreferences {
     quizQuestionTypes: {
       single: true,
       multiple: false,
+      translation: false,
     },
   };
 }

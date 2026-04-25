@@ -51,8 +51,9 @@ export function buildKnowledgeMarkdown(knowledge: KnowledgeResult) {
 export function buildQuizMarkdown(questions: QuizQuestion[]) {
   if (!questions.length) return '暂无练习题';
 
-  const single = questions.filter((question) => question.type === 'single');
-  const multiple = questions.filter((question) => question.type === 'multiple');
+  const single = questions.filter((question) => getEffectiveQuizType(question) === 'single');
+  const multiple = questions.filter((question) => getEffectiveQuizType(question) === 'multiple');
+  const translation = questions.filter((question) => getEffectiveQuizType(question) === 'translation');
 
   return [
     '### 单选题',
@@ -70,6 +71,13 @@ export function buildQuizMarkdown(questions: QuizQuestion[]) {
       `   - 正确答案：${question.answer.join('、')}`,
       `   - 解析：${question.explanation}`,
     ]),
+    '',
+    '### 翻译题',
+    ...translation.flatMap((question, index) => [
+      `${index + 1}. ${question.question}`,
+      `   - 原文答案：${question.answer.join('、')}`,
+      `   - 解析：${question.explanation}`,
+    ]),
   ].join('\n');
 }
 
@@ -78,4 +86,10 @@ export function isSameAnswerSet(left: string[], right: string[]) {
   const normalizedLeft = [...left].sort();
   const normalizedRight = [...right].sort();
   return normalizedLeft.every((item, index) => item === normalizedRight[index]);
+}
+
+export function getEffectiveQuizType(question: QuizQuestion) {
+  if (question.type === 'translation') return 'translation';
+  if (!question.options.length) return 'translation';
+  return question.type;
 }
