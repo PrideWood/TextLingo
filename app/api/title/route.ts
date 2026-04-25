@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateTitle, hasTitleCredentials } from '../../../lib/providers/title';
+import { requireAccess } from '../../../lib/server/access';
 import type { ApiResponse, TitleResult } from '../../../src/types';
 
 function logRequest(body: Record<string, unknown>) {
@@ -20,6 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   if (!hasTitleCredentials()) {
     return NextResponse.json<ApiResponse<never>>({ ok: false, error: '标题服务尚未配置' }, { status: 200 });
   }

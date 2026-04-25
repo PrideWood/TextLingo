@@ -21,7 +21,11 @@ export function readLearningHistory(): LearningHistory {
 
 export function writeLearningHistory(value: LearningHistory) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(historyStorageKey, JSON.stringify(value));
+  try {
+    localStorage.setItem(historyStorageKey, JSON.stringify(value));
+  } catch {
+    // Keep the app usable if localStorage is unavailable or quota is exceeded.
+  }
 }
 
 export function recordLearningActivity() {

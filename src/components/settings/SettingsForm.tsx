@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { readPreferences, writePreferences } from '../../../lib/storage/preferences';
+import { writeThemeState } from '../../../lib/storage/workspace';
 import type { AppPreferences, Language } from '../../types';
 
 const languages: Language[] = ['English', 'Japanese', 'French', 'Chinese'];
@@ -12,6 +13,8 @@ export function SettingsForm() {
 
   useEffect(() => {
     writePreferences(preferences);
+    document.documentElement.classList.toggle('dark', preferences.darkMode);
+    writeThemeState(preferences.darkMode);
   }, [preferences]);
 
   return (
@@ -31,6 +34,22 @@ export function SettingsForm() {
       <main className="mx-auto max-w-5xl px-5 py-8">
         <section className="panel space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
+            <label>
+              <span className="field-label">界面语言 / Interface language</span>
+              <select
+                className="input"
+                value={preferences.uiLanguage}
+                onChange={(event) => setPreferences({ ...preferences, uiLanguage: event.target.value as AppPreferences['uiLanguage'] })}
+              >
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <ToggleRow
+              label="夜间模式 / Dark mode"
+              checked={preferences.darkMode}
+              onChange={(checked) => setPreferences({ ...preferences, darkMode: checked })}
+            />
             <label>
               <span className="field-label">默认原文语言</span>
               <select
@@ -124,19 +143,6 @@ export function SettingsForm() {
               />
             </div>
           </div>
-
-          <label>
-            <span className="field-label">Markdown 导出偏好</span>
-            <select
-              className="input"
-              value={preferences.markdownExportStyle}
-              onChange={(event) =>
-                setPreferences({ ...preferences, markdownExportStyle: event.target.value as AppPreferences['markdownExportStyle'] })
-              }
-            >
-              <option value="obsidian">Obsidian Friendly</option>
-            </select>
-          </label>
 
           <div className="rounded-md border border-black/10 bg-zinc-50 p-4 text-sm leading-7 text-zinc-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
             设置会自动保存到 localStorage。主页面会读取这里的默认语言和自动分析偏好，尽量把重复设置从日常流程里拿掉。

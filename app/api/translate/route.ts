@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTranslateRuntimeConfig, hasTranslateCredentials, translateText } from '../../../lib/providers/translate';
+import { requireAccess } from '../../../lib/server/access';
 import type { ApiResponse, TranslationResult } from '../../../src/types';
 
 function hasTranslateKey() {
@@ -30,6 +31,9 @@ function logRequest(body: Record<string, unknown>) {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   if (!hasTranslateKey()) {
     return NextResponse.json<ApiResponse<never>>({ ok: false, error: '翻译服务尚未配置' }, { status: 200 });
   }

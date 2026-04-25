@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { analyzeText, hasAnalyzeCredentials } from '../../../lib/providers/analyze';
+import { requireAccess } from '../../../lib/server/access';
 import type { AnalysisResult, ApiResponse } from '../../../src/types';
+
+export const maxDuration = 30;
 
 export async function GET() {
   return NextResponse.json<ApiResponse<{ configured: boolean }>>({
@@ -10,6 +13,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   const body = await request.json().catch(() => null);
 
   if (!body?.text || typeof body.text !== 'string') {

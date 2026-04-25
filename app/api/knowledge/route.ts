@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { extractKnowledge, hasKnowledgeCredentials } from '../../../lib/providers/knowledge';
+import { requireAccess } from '../../../lib/server/access';
 import type { ApiResponse, KnowledgeSection } from '../../../src/types';
 
 function hasKnowledgeKey() {
@@ -27,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   if (!hasKnowledgeKey()) {
     return NextResponse.json<ApiResponse<never>>({ ok: false, error: '知识点服务尚未配置' }, { status: 200 });
   }

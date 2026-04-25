@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateSpeech } from '../../../lib/providers/tts';
+import { requireAccess } from '../../../lib/server/access';
 import type { ApiResponse, TtsResult } from '../../../src/types';
 
 function hasTtsKey() {
@@ -27,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   if (!hasTtsKey()) {
     return NextResponse.json<ApiResponse<never>>({ ok: false, error: 'TTS 服务尚未配置' }, { status: 200 });
   }

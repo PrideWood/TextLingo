@@ -2,6 +2,7 @@
 
 import { CheckCircle2, ClipboardCopy, Copy, RotateCcw, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { copyTextToClipboard } from '../../../lib/clipboard';
 import { buildMarkdownExport } from '../../../lib/export/markdown';
 import type { AnalysisResult, AnalysisState, KnowledgeResult, KnowledgeSection, Language, QuizQuestion } from '../../types';
 import { getKnowledgeNote, getKnowledgeSnippet, getKnowledgeTerm } from '../study/studyUtils';
@@ -14,6 +15,7 @@ interface ResultDocumentProps {
 
 export function ResultDocument({ sourceText, analysis, sourceLanguage }: ResultDocumentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
 
   const title = analysis.data.title?.trim() || 'Untitled Language Note';
   const result = analysis.data as AnalysisResult;
@@ -29,9 +31,14 @@ export function ResultDocument({ sourceText, analysis, sourceLanguage }: ResultD
   );
 
   const copy = async (key: string, value: string) => {
-    await navigator.clipboard.writeText(value);
+    setCopyError('');
+    const copied = await copyTextToClipboard(value);
+    if (!copied) {
+      setCopyError('复制失败，请手动选择文本复制。');
+      return;
+    }
     setCopiedKey(key);
-    window.setTimeout(() => setCopiedKey(null), 1200);
+    window.setTimeout(() => setCopiedKey(null), 1500);
   };
 
   if (analysis.status === 'loading') {
@@ -112,6 +119,7 @@ export function ResultDocument({ sourceText, analysis, sourceLanguage }: ResultD
             disabled={!analysis.data.quiz?.length}
           />
         </div>
+        {copyError ? <p className="text-sm text-coral">{copyError}</p> : null}
       </div>
 
       <article className="mt-8 space-y-8">

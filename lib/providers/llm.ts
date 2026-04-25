@@ -50,16 +50,27 @@ function normalizeBaseUrl(rawBaseUrl?: string | null) {
 
 export function getLlmRuntimeConfig(prefixes: string[], fallbackModel = 'gpt-4.1-mini'): LlmRuntimeConfig {
   const keys = prefixes.map((prefix) => prefix.toUpperCase());
+  const prefixApiKey = keys.map((key) => process.env[`${key}_API_KEY`]).find(Boolean);
+  const prefixModel = keys.map((key) => process.env[`${key}_MODEL`]).find(Boolean);
+  const prefixBaseUrl = keys.map((key) => process.env[`${key}_BASE_URL`]).find(Boolean);
+  const canUseQwenForText = Boolean(process.env.QWEN_TEXT_MODEL);
   const apiKey =
-    keys.map((key) => process.env[`${key}_API_KEY`]).find(Boolean) ||
+    prefixApiKey ||
+    process.env.DEEPSEEK_API_KEY ||
+    (canUseQwenForText ? process.env.QWEN_API_KEY : undefined) ||
     process.env.OPENAI_API_KEY ||
     null;
   const model =
-    keys.map((key) => process.env[`${key}_MODEL`]).find(Boolean) ||
+    prefixModel ||
+    (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash' : undefined) ||
+    (canUseQwenForText ? process.env.QWEN_TEXT_MODEL : undefined) ||
     process.env.OPENAI_MODEL ||
     fallbackModel;
   const baseUrl = normalizeBaseUrl(
-    keys.map((key) => process.env[`${key}_BASE_URL`]).find(Boolean) || process.env.OPENAI_BASE_URL,
+    prefixBaseUrl ||
+      (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1' : undefined) ||
+      (canUseQwenForText ? process.env.QWEN_BASE_URL : undefined) ||
+      process.env.OPENAI_BASE_URL,
   );
   const apiStyle =
     /deepseek/i.test(baseUrl) || /^deepseek-/i.test(model) ? 'chat_completions' : 'responses';
@@ -216,11 +227,7 @@ export async function requestLlmText(params: {
   }
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'error' in payload && payload.error?.message
-        ? payload.error.message
-        : `${feature}服务请求失败`;
-    throw new Error(message);
+    throw new Error(`${feature}服务请求失败（HTTP ${response.status}）`);
   }
 
   if (!payload || typeof payload !== 'object') {

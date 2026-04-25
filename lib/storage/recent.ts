@@ -30,7 +30,11 @@ export function readRecentStudies(): RecentStudyRecord[] {
 
 export function writeRecentStudies(records: RecentStudyRecord[]) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(recentStorageKey, JSON.stringify(records.slice(0, maxRecentRecords)));
+  try {
+    localStorage.setItem(recentStorageKey, JSON.stringify(records.slice(0, maxRecentRecords)));
+  } catch {
+    // Keep the app usable if localStorage is unavailable or quota is exceeded.
+  }
 }
 
 export function saveRecentStudy(input: {

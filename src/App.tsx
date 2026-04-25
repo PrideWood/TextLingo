@@ -2,10 +2,12 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { fetchWithAccess, isAccessUnauthorizedError } from '../lib/client/api';
 import { recordLearningActivity } from '../lib/storage/progress';
 import { readPreferences, writePreferences } from '../lib/storage/preferences';
 import { clearRecentStudies, deleteRecentStudy, readRecentStudies, saveRecentStudy } from '../lib/storage/recent';
-import { clearWorkspaceStorage, readThemeState, readWorkspaceAnalysis, readWorkspaceText, writeThemeState, writeWorkspaceAnalysis, writeWorkspaceText } from '../lib/storage/workspace';
+import { clearWorkspaceStorage, readWorkspaceAnalysis, readWorkspaceText, writeThemeState, writeWorkspaceAnalysis, writeWorkspaceText } from '../lib/storage/workspace';
+import { AccessGate } from './components/access/AccessGate';
 import { HomeView } from './components/home/HomeView';
 import { LoadingView } from './components/home/LoadingView';
 import { StudyWorkspace } from './components/study/StudyWorkspace';
@@ -40,7 +42,7 @@ async function postApi<T>(endpoint: string, payload: AnalysisRequest): Promise<T
   }
 
   try {
-    response = await fetch(endpoint, {
+    response = await fetchWithAccess(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -74,9 +76,10 @@ async function postApi<T>(endpoint: string, payload: AnalysisRequest): Promise<T
 }
 
 export default function App() {
+  const [accessGranted, setAccessGranted] = useState(false);
+  const [accessMessage, setAccessMessage] = useState('');
   const [text, setText] = useState(readWorkspaceText);
   const [preferences, setPreferences] = useState(readPreferences);
-  const [isDark] = useState(readThemeState);
   const [analysis, setAnalysis] = useState<AnalysisState>(readWorkspaceAnalysis);
   const [view, setView] = useState<AppView>(() => {
     const saved = readWorkspaceAnalysis();
@@ -92,9 +95,9 @@ export default function App() {
   const [inputError, setInputError] = useState('');
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-    writeThemeState(isDark);
-  }, [isDark]);
+    document.documentElement.classList.toggle('dark', preferences.darkMode);
+    writeThemeState(preferences.darkMode);
+  }, [preferences.darkMode]);
 
   useEffect(() => {
     writeWorkspaceText(text);
@@ -108,8 +111,10 @@ export default function App() {
     setRecentRecords(readRecentStudies());
   }, []);
 
-  const handleAnalyze = async () => {
-    if (!text.trim()) {
+  const handleAnalyze = async (nextText?: string) => {
+    const analysisText = nextText ?? text;
+
+    if (!analysisText.trim()) {
       setInputError('先粘贴一段想学习的原文，再开始分析。');
       setAnalysis({ status: 'empty', data: {}, error: '' });
       setView('start');
@@ -121,7 +126,7 @@ export default function App() {
     setView('loading');
 
     const payload: AnalysisRequest = {
-      text,
+      text: analysisText,
       sourceLanguage: preferences.sourceLanguage,
       targetLanguage: preferences.targetLanguage,
       options: {
@@ -137,7 +142,8 @@ export default function App() {
 
     try {
       const data = await postApi<AnalysisResult>('/api/analyze', payload);
-      const sourceText = text.trim();
+      const sourceText = analysisText.trim();
+      setText(analysisText);
       setAnalysis({ status: 'success', data, error: '' });
       setCurrentStudy({
         sourceText,
@@ -158,6 +164,13 @@ export default function App() {
         setProgressRefreshKey((value) => value + 1);
       }
     } catch (error) {
+      if (isAccessUnauthorizedError(error)) {
+        setAccessGranted(false);
+        setAccessMessage(error.message);
+        setView('start');
+        return;
+      }
+
       setAnalysis({
         status: 'error',
         data: {},
@@ -206,6 +219,24 @@ export default function App() {
     writePreferences(nextPreferences);
   };
 
+  const handleAccessExpired = (message: string) => {
+    setAccessGranted(false);
+    setAccessMessage(message);
+    setView('start');
+  };
+
+  if (!accessGranted) {
+    return (
+      <AccessGate
+        initialMessage={accessMessage}
+        onGranted={() => {
+          setAccessGranted(true);
+          setAccessMessage('');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-cloud text-ink transition-colors dark:bg-zinc-950 dark:text-zinc-100">
       <div className="view-transition">
@@ -217,12 +248,14 @@ export default function App() {
             requestError={analysis.status === 'error' ? analysis.error : ''}
             sourceLanguage={preferences.sourceLanguage}
             targetLanguage={preferences.targetLanguage}
+            uiLanguage={preferences.uiLanguage}
             preferences={preferences}
             recentRecords={recentRecords}
             progressRefreshKey={progressRefreshKey}
             onPreferencesChange={handlePreferencesChange}
             onAnalyze={handleAnalyze}
             onClearText={handleClear}
+            onAccessExpired={handleAccessExpired}
             onOpenRecent={handleOpenRecent}
             onDeleteRecent={handleDeleteRecent}
             onClearRecent={handleClearRecent}
@@ -235,13 +268,14 @@ export default function App() {
           <main className="mx-auto max-w-7xl space-y-4 px-5 py-6">
             <button className="inline-flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white" onClick={handleBackToStart}>
               <ArrowLeft size={16} />
-              返回首页
+              {preferences.uiLanguage === 'zh' ? '返回首页' : 'Back home'}
             </button>
             <StudyWorkspace
               sourceText={currentStudy.sourceText.trim() || '暂无原文'}
               result={analysis.data}
               sourceLanguage={currentStudy.sourceLanguage}
               targetLanguage={currentStudy.targetLanguage}
+              uiLanguage={preferences.uiLanguage}
             />
           </main>
         ) : null}

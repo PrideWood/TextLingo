@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateQuiz, hasQuizCredentials } from '../../../lib/providers/quiz';
+import { requireAccess } from '../../../lib/server/access';
 import type { ApiResponse, QuizQuestion } from '../../../src/types';
 
 function hasQuizKey() {
@@ -27,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const accessError = requireAccess(request);
+  if (accessError) return accessError;
+
   if (!hasQuizKey()) {
     return NextResponse.json<ApiResponse<never>>({ ok: false, error: '出题服务尚未配置' }, { status: 200 });
   }

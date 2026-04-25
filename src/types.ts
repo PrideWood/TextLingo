@@ -4,6 +4,9 @@ export type RequestStatus = 'empty' | 'loading' | 'success' | 'error';
 
 export type MarkdownExportStyle = 'obsidian';
 
+export type OcrProvider = 'qwen-vl' | 'openai' | 'custom';
+export type UiLanguage = 'zh' | 'en';
+
 export interface AnalysisRequest {
   text: string;
   sourceLanguage: Language;
@@ -131,9 +134,28 @@ export interface AppPreferences {
   autoGenerateQuiz: boolean;
   recordHistory: boolean;
   markdownExportStyle: MarkdownExportStyle;
+  uiLanguage: UiLanguage;
+  darkMode: boolean;
   enableDifficultyRating: boolean;
   knowledgeDetailLevel: KnowledgeDetailLevel;
   quizQuestionTypes: QuizQuestionTypes;
+  obsidian: ObsidianPreferences;
+  ocr: OcrPreferences;
+}
+
+export interface ObsidianPreferences {
+  enableObsidianExport: boolean;
+  vault: string;
+  folder: string;
+  fileNameTemplate: string;
+  openAfterCreate: boolean;
+}
+
+export interface OcrPreferences {
+  enableOcr: boolean;
+  provider: OcrProvider;
+  model: string;
+  baseUrl?: string;
 }
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };

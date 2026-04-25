@@ -19,7 +19,6 @@ interface StudyOutlineProps {
 export function StudyOutline({ items, currentIndex, visited, onSelect }: StudyOutlineProps) {
   return (
     <aside className="w-full shrink-0 overflow-x-hidden rounded-lg border border-black/10 bg-white p-3 shadow-soft dark:border-white/10 dark:bg-zinc-900 lg:w-[260px]">
-      <p className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-mint">Study Outline</p>
       <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-1 lg:overflow-x-hidden">
         {items.map((item, index) => {
           const Icon = item.icon;

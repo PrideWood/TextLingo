@@ -16,7 +16,11 @@ export function readWorkspaceText() {
 
 export function writeWorkspaceText(value: string) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(textStorageKey, value);
+  try {
+    localStorage.setItem(textStorageKey, value);
+  } catch {
+    // Keep the in-memory text state usable if persistence is unavailable.
+  }
 }
 
 export function readWorkspaceAnalysis(): AnalysisState {
@@ -45,13 +49,21 @@ export function readWorkspaceAnalysis(): AnalysisState {
 
 export function writeWorkspaceAnalysis(value: AnalysisState) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(analysisStorageKey, JSON.stringify(value));
+  try {
+    localStorage.setItem(analysisStorageKey, JSON.stringify(value));
+  } catch {
+    // Keep the in-memory analysis state usable if persistence is unavailable.
+  }
 }
 
 export function clearWorkspaceStorage() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(textStorageKey);
-  localStorage.removeItem(analysisStorageKey);
+  try {
+    localStorage.removeItem(textStorageKey);
+    localStorage.removeItem(analysisStorageKey);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
 }
 
 export function readThemeState() {
@@ -66,5 +78,9 @@ export function readThemeState() {
 
 export function writeThemeState(isDark: boolean) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(themeStorageKey, isDark ? 'dark' : 'light');
+  try {
+    localStorage.setItem(themeStorageKey, isDark ? 'dark' : 'light');
+  } catch {
+    // Ignore theme persistence failures.
+  }
 }

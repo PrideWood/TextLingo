@@ -1,6 +1,6 @@
 'use client';
 
-import type { AppPreferences } from '../../types';
+import type { AppPreferences, UiLanguage } from '../../types';
 import type { RecentStudyRecord } from '../../types/recent';
 import { HeroInput } from './HeroInput';
 import { HomeHeatmapCard } from './HomeHeatmapCard';
@@ -13,12 +13,14 @@ interface HomeViewProps {
   requestError: string;
   sourceLanguage: string;
   targetLanguage: string;
+  uiLanguage: UiLanguage;
   preferences: AppPreferences;
   recentRecords: RecentStudyRecord[];
   progressRefreshKey: number;
   onPreferencesChange: (preferences: AppPreferences) => void;
-  onAnalyze: () => void;
+  onAnalyze: (text?: string) => void;
   onClearText: () => void;
+  onAccessExpired: (message: string) => void;
   onOpenRecent: (record: RecentStudyRecord) => void;
   onDeleteRecent: (id: string) => void;
   onClearRecent: () => void;
@@ -31,12 +33,14 @@ export function HomeView({
   requestError,
   sourceLanguage,
   targetLanguage,
+  uiLanguage,
   preferences,
   recentRecords,
   progressRefreshKey,
   onPreferencesChange,
   onAnalyze,
   onClearText,
+  onAccessExpired,
   onOpenRecent,
   onDeleteRecent,
   onClearRecent,
@@ -50,15 +54,17 @@ export function HomeView({
         requestError={requestError}
         sourceLanguage={sourceLanguage}
         targetLanguage={targetLanguage}
+        uiLanguage={uiLanguage}
         preferences={preferences}
         onPreferencesChange={onPreferencesChange}
         onAnalyze={onAnalyze}
         onClear={onClearText}
+        onAccessExpired={onAccessExpired}
       />
 
       <section className="mt-7 grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
-        <RecentList records={recentRecords} onOpen={onOpenRecent} onDelete={onDeleteRecent} onClear={onClearRecent} />
-        <HomeHeatmapCard refreshKey={progressRefreshKey} />
+        <RecentList records={recentRecords} onOpen={onOpenRecent} onDelete={onDeleteRecent} onClear={onClearRecent} uiLanguage={uiLanguage} />
+        <HomeHeatmapCard refreshKey={progressRefreshKey} uiLanguage={uiLanguage} />
       </section>
     </main>
   );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { BarChart3, ClipboardCopy, LogIn, LogOut, Settings, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { copyTextToClipboard } from '../../../lib/clipboard';
 import { UsageDetailsModal } from '../progress/UsageDetailsModal';
 
 interface UserMenuProps {
@@ -47,10 +48,11 @@ export function UserMenu({ markdown }: UserMenuProps) {
 
   const copyMarkdown = async () => {
     if (!markdown) return;
-    await navigator.clipboard.writeText(markdown);
+    const ok = await copyTextToClipboard(markdown);
+    if (!ok) return;
     setCopied(true);
     setOpen(false);
-    window.setTimeout(() => setCopied(false), 1200);
+    window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (

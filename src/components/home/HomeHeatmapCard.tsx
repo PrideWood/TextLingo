@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { readLearningHistory, summarizeLearningHistory } from '../../../lib/storage/progress';
 import { UsageDetailsModal } from '../progress/UsageDetailsModal';
+import type { UiLanguage } from '../../types';
 
 interface HomeHeatmapCardProps {
   refreshKey: number;
+  uiLanguage: UiLanguage;
 }
 
-export function HomeHeatmapCard({ refreshKey }: HomeHeatmapCardProps) {
+export function HomeHeatmapCard({ refreshKey, uiLanguage }: HomeHeatmapCardProps) {
   void refreshKey;
   const [open, setOpen] = useState(false);
   const summary = summarizeLearningHistory(readLearningHistory());
@@ -16,10 +18,12 @@ export function HomeHeatmapCard({ refreshKey }: HomeHeatmapCardProps) {
 
   return (
     <>
-      <section className="cursor-pointer px-1 py-2" onClick={() => setOpen(true)}>
-        <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Learning rhythm</h2>
+      <section className="cursor-pointer px-1 py-2 text-center" onClick={() => setOpen(true)}>
+        <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+          {uiLanguage === 'zh' ? '学习节奏' : 'Learning rhythm'}
+        </h2>
 
-        <div className="mt-3 grid max-w-[176px] grid-cols-7 gap-1.5">
+        <div className="mx-auto mt-3 grid max-w-[176px] grid-cols-7 gap-1.5">
           {monthHeatmap.map((item) => (
             <div
               key={item.date}
