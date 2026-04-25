@@ -44,6 +44,17 @@ npm run build
 
 `app/api/analyze/route.ts` 和 `app/api/ocr/route.ts` 预留了 `maxDuration = 30`，用于降低文本分析和 OCR 请求在 serverless 环境中超时的风险。
 
+### Custom Domain
+
+TextLingo 使用相对路径调用站内资源和 API，例如 `/api/analyze`、`/api/ocr`、`/textlingo-logo.png`。绑定自定义域名（例如 `tl.dacnote.com`）时不需要修改代码里的 API base path。
+
+在 Vercel 绑定域名后，请确认：
+
+- DNS 已指向 Vercel。
+- Environment Variables 配置在同一个 Vercel project 中。
+- 修改域名或环境变量后重新部署。
+- Access code gate、Analyze、OCR、Copy Markdown 和 Obsidian export 都在自定义域名下测试一次。
+
 ## Required Environment Variables
 
 ### Access Code Protection

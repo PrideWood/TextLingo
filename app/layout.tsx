@@ -5,6 +5,7 @@ import '../src/styles.css';
 export const metadata: Metadata = {
   title: 'TextLingo',
   description: 'A language learning workspace for translation, knowledge extraction, quizzes, and TTS.',
+  manifest: '/site.webmanifest',
   icons: {
     icon: [
       { url: '/favicon.ico' },

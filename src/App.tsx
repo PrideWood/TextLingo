@@ -47,7 +47,11 @@ async function postApi<T>(endpoint: string, payload: AnalysisRequest): Promise<T
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-  } catch {
+  } catch (error) {
+    if (isAccessUnauthorizedError(error)) {
+      throw error;
+    }
+
     throw new Error('服务请求失败');
   }
 

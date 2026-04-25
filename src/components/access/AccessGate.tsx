@@ -24,7 +24,7 @@ export function AccessGate({ onGranted, initialMessage = '' }: AccessGateProps) 
         setCode(storedCode);
       }
 
-      if (!hasStoredAccessGrant() && !storedCode) {
+      if (!storedCode) {
         const devAccess = await verifyCode('');
         if (alive && devAccess.ok) {
           storeAccessGrant('');
@@ -33,8 +33,14 @@ export function AccessGate({ onGranted, initialMessage = '' }: AccessGateProps) 
         }
 
         if (alive) {
+          clearAccessGrant();
           setStatus('idle');
         }
+        return;
+      }
+
+      if (!hasStoredAccessGrant()) {
+        setStatus('idle');
         return;
       }
 
@@ -130,11 +136,15 @@ export function AccessGate({ onGranted, initialMessage = '' }: AccessGateProps) 
 }
 
 async function verifyCode(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+
   try {
     const response = await fetch('/api/access/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
+      signal: controller.signal,
     });
     const json = (await response.json().catch(() => null)) as ApiResponse<{ granted: true }> | null;
 
@@ -143,7 +153,13 @@ async function verifyCode(code: string): Promise<{ ok: true } | { ok: false; err
     }
 
     return json.ok ? { ok: true } : { ok: false, error: json.error || 'Invalid access code' };
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { ok: false, error: 'Access verification timed out. Please check the local dev server.' };
+    }
+
     return { ok: false, error: 'Access verification failed.' };
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
