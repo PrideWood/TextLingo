@@ -43,6 +43,7 @@ export async function POST(request: Request) {
         bytes: image.size,
         provider: formData?.get('provider'),
         model: formData?.get('model'),
+        sourceLanguage: formData?.get('sourceLanguage'),
         hasBaseUrl: Boolean(String(formData?.get('baseUrl') || '').trim()),
       });
     }
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
       provider: String(formData?.get('provider') || ''),
       model: String(formData?.get('model') || ''),
       baseUrl: String(formData?.get('baseUrl') || ''),
+      sourceLanguage: String(formData?.get('sourceLanguage') || ''),
     });
 
     return NextResponse.json<ApiResponse<{ text: string }>>({ ok: true, data });

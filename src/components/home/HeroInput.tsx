@@ -144,6 +144,7 @@ export function HeroInput({
     formData.append('provider', preferences.ocr.provider);
     formData.append('model', preferences.ocr.model);
     formData.append('baseUrl', preferences.ocr.baseUrl ?? '');
+    formData.append('sourceLanguage', sourceLanguage);
 
     const response = await fetchWithAccess('/api/ocr', {
       method: 'POST',

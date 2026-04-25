@@ -1,10 +1,15 @@
-import type { OcrProvider } from '../../src/types';
+import type { Language, OcrProvider } from '../../src/types';
 
 type ChatContent =
   | string
   | Array<{
       type?: string;
       text?: string;
+      image_url?: {
+        url?: string;
+      };
+      min_pixels?: number;
+      max_pixels?: number;
     }>;
 
 interface QwenVisionResponse {
@@ -24,6 +29,7 @@ export interface OcrProviderInput {
   provider?: OcrProvider | string;
   model?: string;
   baseUrl?: string;
+  sourceLanguage?: Language | string;
 }
 
 interface OcrRuntimeConfig {
@@ -36,6 +42,9 @@ interface OcrRuntimeConfig {
 
 const defaultBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const defaultModel = 'qwen-vl-ocr-latest';
+const qwenOcrMinPixels = 32 * 32 * 3;
+const qwenOcrMaxPixels = 32 * 32 * 8192;
+const supportedSourceLanguages: Language[] = ['English', 'Japanese', 'French', 'Chinese'];
 
 export function hasOcrCredentials() {
   return Boolean(resolveOcrRuntimeConfig().apiKey);
@@ -88,18 +97,21 @@ export async function recognizeWithQwenVision(input: OcrProviderInput): Promise<
             role: 'user',
             content: [
               {
+                type: 'text',
+                text: buildOcrPrompt(input.sourceLanguage),
+              },
+              {
                 type: 'image_url',
                 image_url: {
                   url: dataUrl,
                 },
-              },
-              {
-                type: 'text',
-                text: 'Extract all readable text from the image. Preserve line breaks and paragraph structure as much as possible. Do not translate. Do not summarize. Return only the recognized text.',
+                min_pixels: qwenOcrMinPixels,
+                max_pixels: qwenOcrMaxPixels,
               },
             ],
           },
         ],
+        max_tokens: 4096,
         stream: false,
       }),
     });
@@ -150,6 +162,42 @@ export function extractTextFromQwenResponse(raw: QwenVisionResponse | null) {
   }
 
   return '';
+}
+
+export function buildOcrPrompt(sourceLanguage?: Language | string) {
+  const normalizedLanguage = normalizeSourceLanguage(sourceLanguage);
+  const languageInstruction = normalizedLanguage
+    ? `The user's selected source/original language is ${normalizedLanguage}. Prioritize accurate recognition of ${describeLanguageScripts(normalizedLanguage)}.`
+    : 'The source/original language is unknown. Preserve every script visible in the image.';
+
+  return [
+    languageInstruction,
+    'Transcribe every readable character in this image exactly as written.',
+    'Preserve the original language and scripts, including punctuation, Latin letters, and numbers.',
+    'Preserve line breaks and paragraph structure as much as possible.',
+    'Do not translate, summarize, format as JSON, or extract only numeric fields.',
+    'Return only the recognized text.',
+  ].join(' ');
+}
+
+function normalizeSourceLanguage(sourceLanguage?: Language | string): Language | null {
+  const trimmed = sourceLanguage?.trim();
+  const matched = supportedSourceLanguages.find((language) => language === trimmed);
+
+  return matched ?? null;
+}
+
+function describeLanguageScripts(language: Language) {
+  switch (language) {
+    case 'Japanese':
+      return 'Japanese kanji, hiragana, katakana, Japanese punctuation, and any embedded Latin letters or numbers';
+    case 'Chinese':
+      return 'Chinese characters, Chinese punctuation, and any embedded Latin letters or numbers';
+    case 'French':
+      return 'French text, accents, apostrophes, punctuation, and any embedded numbers';
+    case 'English':
+      return 'English text, punctuation, and any embedded numbers';
+  }
 }
 
 function resolveOcrRuntimeConfig(input?: Partial<OcrProviderInput>): OcrRuntimeConfig {
