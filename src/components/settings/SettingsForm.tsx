@@ -13,8 +13,12 @@ export function SettingsForm() {
 
   useEffect(() => {
     writePreferences(preferences);
-    document.documentElement.classList.toggle('dark', preferences.darkMode);
-    writeThemeState(preferences.darkMode);
+    const systemQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const isDark =
+      preferences.appearanceMode === 'dark' ||
+      (preferences.appearanceMode === 'system' && systemQuery.matches);
+    document.documentElement.classList.toggle('dark', isDark);
+    writeThemeState(isDark);
   }, [preferences]);
 
   return (
@@ -45,11 +49,18 @@ export function SettingsForm() {
                 <option value="en">English</option>
               </select>
             </label>
-            <ToggleRow
-              label="夜间模式 / Dark mode"
-              checked={preferences.darkMode}
-              onChange={(checked) => setPreferences({ ...preferences, darkMode: checked })}
-            />
+            <label>
+              <span className="field-label">外观颜色 / Appearance</span>
+              <select
+                className="input"
+                value={preferences.appearanceMode}
+                onChange={(event) => setPreferences({ ...preferences, appearanceMode: event.target.value as AppPreferences['appearanceMode'] })}
+              >
+                <option value="light">浅色 / Light</option>
+                <option value="dark">深色 / Dark</option>
+                <option value="system">跟随系统 / System</option>
+              </select>
+            </label>
             <label>
               <span className="field-label">默认原文语言</span>
               <select

@@ -12,7 +12,7 @@ export const defaultPreferences: AppPreferences = {
   recordHistory: true,
   markdownExportStyle: 'obsidian',
   uiLanguage: 'zh',
-  darkMode: false,
+  appearanceMode: 'light',
   enableDifficultyRating: true,
   knowledgeDetailLevel: 'medium',
   quizQuestionTypes: {
@@ -20,7 +20,7 @@ export const defaultPreferences: AppPreferences = {
     multiple: true,
   },
   obsidian: {
-    enableObsidianExport: false,
+    enableObsidianExport: true,
     vault: '',
     folder: 'TextLingo',
     fileNameTemplate: '{{date}} - {{title}}',
@@ -58,6 +58,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
   if (!value || typeof value !== 'object') return defaultPreferences;
 
   const raw = value as Partial<AppPreferences>;
+  const legacyRaw = raw as Partial<AppPreferences> & { darkMode?: boolean };
   const quizQuestionTypes = {
     ...defaultPreferences.quizQuestionTypes,
     ...(raw.quizQuestionTypes ?? {}),
@@ -71,7 +72,12 @@ export function normalizePreferences(value: unknown): AppPreferences {
     ...defaultPreferences,
     ...raw,
     uiLanguage: raw.uiLanguage === 'en' ? 'en' : 'zh',
-    darkMode: Boolean(raw.darkMode),
+    appearanceMode:
+      raw.appearanceMode === 'dark' || raw.appearanceMode === 'system'
+        ? raw.appearanceMode
+        : legacyRaw.darkMode
+          ? 'dark'
+          : 'light',
     quizQuestionTypes,
     obsidian: {
       ...defaultPreferences.obsidian,

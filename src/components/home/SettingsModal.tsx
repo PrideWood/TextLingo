@@ -6,6 +6,7 @@ import { writePreferences } from '../../../lib/storage/preferences';
 import type { AppPreferences, Language } from '../../types';
 
 const languages: Language[] = ['English', 'Japanese', 'French', 'Chinese'];
+const controlWidthClass = 'w-[180px]';
 
 interface SettingsModalProps {
   open: boolean;
@@ -33,7 +34,10 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
     learning: isZh ? '学习设置' : 'Learning settings',
     interface: isZh ? '界面与外观' : 'Interface & appearance',
     language: isZh ? '界面语言' : 'Interface language',
-    darkMode: isZh ? '夜间模式' : 'Dark mode',
+    appearance: isZh ? '外观颜色' : 'Appearance',
+    light: isZh ? '浅色' : 'Light',
+    dark: isZh ? '深色' : 'Dark',
+    system: isZh ? '跟随系统' : 'System',
     sourceLanguage: isZh ? '默认原文语言' : 'Default source language',
     targetLanguage: isZh ? '默认目标语言' : 'Default target language',
     generation: isZh ? '语言与生成' : 'Language & generation',
@@ -80,6 +84,16 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
     onClose();
   };
 
+  const updateDraft = (next: AppPreferences) => {
+    setDraft(next);
+  };
+
+  const updateDraftAndApply = (next: AppPreferences) => {
+    setDraft(next);
+    writePreferences(next);
+    onSave(next);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8" onMouseDown={onClose}>
       <section
@@ -88,7 +102,6 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="eyebrow">{label.settings}</p>
             <h2 className="section-title">{label.learning}</h2>
           </div>
           <button
@@ -105,25 +118,38 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
         <SettingsGroup title={label.interface}>
           <SettingRow label={label.language}>
             <select
-              className="input h-9 w-[180px] py-1.5"
+              className={`input h-9 ${controlWidthClass} py-1.5`}
               value={draft.uiLanguage}
-              onChange={(event) => setDraft({ ...draft, uiLanguage: event.target.value as AppPreferences['uiLanguage'] })}
+              onChange={(event) => updateDraft({ ...draft, uiLanguage: event.target.value as AppPreferences['uiLanguage'] })}
             >
               <option value="zh">中文</option>
               <option value="en">English</option>
             </select>
           </SettingRow>
-          <SettingRow label={label.darkMode}>
-            <Switch checked={draft.darkMode} onChange={(checked) => setDraft({ ...draft, darkMode: checked })} />
+          <SettingRow label={label.appearance}>
+            <select
+              className={`input h-9 ${controlWidthClass} py-1.5`}
+              value={draft.appearanceMode}
+              onChange={(event) =>
+                updateDraftAndApply({
+                  ...draft,
+                  appearanceMode: event.target.value as AppPreferences['appearanceMode'],
+                })
+              }
+            >
+              <option value="light">{label.light}</option>
+              <option value="dark">{label.dark}</option>
+              <option value="system">{label.system}</option>
+            </select>
           </SettingRow>
         </SettingsGroup>
 
         <SettingsGroup title={label.generation}>
           <SettingRow label={label.sourceLanguage}>
             <select
-              className="input h-9 w-[180px] py-1.5"
+              className={`input h-9 ${controlWidthClass} py-1.5`}
               value={draft.sourceLanguage}
-              onChange={(event) => setDraft({ ...draft, sourceLanguage: event.target.value as Language })}
+              onChange={(event) => updateDraft({ ...draft, sourceLanguage: event.target.value as Language })}
             >
               {languages.map((language) => (
                 <option key={language}>{language}</option>
@@ -132,9 +158,9 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
           </SettingRow>
           <SettingRow label={label.targetLanguage}>
             <select
-              className="input h-9 w-[180px] py-1.5"
+              className={`input h-9 ${controlWidthClass} py-1.5`}
               value={draft.targetLanguage}
-              onChange={(event) => setDraft({ ...draft, targetLanguage: event.target.value as Language })}
+              onChange={(event) => updateDraft({ ...draft, targetLanguage: event.target.value as Language })}
             >
               {languages.map((language) => (
                 <option key={language}>{language}</option>
@@ -142,28 +168,28 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
             </select>
           </SettingRow>
           <SettingRow label={label.autoTitle}>
-            <Switch checked={draft.autoGenerateTitle} onChange={(checked) => setDraft({ ...draft, autoGenerateTitle: checked })} />
+            <Switch checked={draft.autoGenerateTitle} onChange={(checked) => updateDraft({ ...draft, autoGenerateTitle: checked })} />
           </SettingRow>
           <SettingRow label={label.autoTranslation}>
-            <Switch checked={draft.autoGenerateTranslation} onChange={(checked) => setDraft({ ...draft, autoGenerateTranslation: checked })} />
+            <Switch checked={draft.autoGenerateTranslation} onChange={(checked) => updateDraft({ ...draft, autoGenerateTranslation: checked })} />
           </SettingRow>
           <SettingRow label={label.autoKnowledge}>
-            <Switch checked={draft.autoGenerateKnowledge} onChange={(checked) => setDraft({ ...draft, autoGenerateKnowledge: checked })} />
+            <Switch checked={draft.autoGenerateKnowledge} onChange={(checked) => updateDraft({ ...draft, autoGenerateKnowledge: checked })} />
           </SettingRow>
           <SettingRow label={label.autoQuiz}>
-            <Switch checked={draft.autoGenerateQuiz} onChange={(checked) => setDraft({ ...draft, autoGenerateQuiz: checked })} />
+            <Switch checked={draft.autoGenerateQuiz} onChange={(checked) => updateDraft({ ...draft, autoGenerateQuiz: checked })} />
           </SettingRow>
           <SettingRow label={label.recordHistory}>
-            <Switch checked={draft.recordHistory} onChange={(checked) => setDraft({ ...draft, recordHistory: checked })} />
+            <Switch checked={draft.recordHistory} onChange={(checked) => updateDraft({ ...draft, recordHistory: checked })} />
           </SettingRow>
           <SettingRow label={label.difficulty}>
-            <Switch checked={draft.enableDifficultyRating} onChange={(checked) => setDraft({ ...draft, enableDifficultyRating: checked })} />
+            <Switch checked={draft.enableDifficultyRating} onChange={(checked) => updateDraft({ ...draft, enableDifficultyRating: checked })} />
           </SettingRow>
           <SettingRow label={label.detailLevel}>
             <select
-              className="input h-9 w-[260px] py-1.5"
+              className={`input h-9 ${controlWidthClass} py-1.5`}
               value={draft.knowledgeDetailLevel}
-              onChange={(event) => setDraft({ ...draft, knowledgeDetailLevel: event.target.value as AppPreferences['knowledgeDetailLevel'] })}
+              onChange={(event) => updateDraft({ ...draft, knowledgeDetailLevel: event.target.value as AppPreferences['knowledgeDetailLevel'] })}
             >
               <option value="basic">Basic - detailed</option>
               <option value="medium">Medium - balanced</option>
@@ -172,8 +198,8 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
           </SettingRow>
           <SettingRow label={label.quizTypes}>
             <div className="flex flex-wrap justify-end gap-3">
-              <InlineCheck label={label.single} checked={draft.quizQuestionTypes.single} onChange={(checked) => setDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, single: checked } })} />
-              <InlineCheck label={label.multiple} checked={draft.quizQuestionTypes.multiple} onChange={(checked) => setDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, multiple: checked } })} />
+              <InlineCheck label={label.single} checked={draft.quizQuestionTypes.single} onChange={(checked) => updateDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, single: checked } })} />
+              <InlineCheck label={label.multiple} checked={draft.quizQuestionTypes.multiple} onChange={(checked) => updateDraft({ ...draft, quizQuestionTypes: { ...draft.quizQuestionTypes, multiple: checked } })} />
             </div>
           </SettingRow>
           {quizTypeError ? <p className="px-1 text-xs text-coral">{quizTypeError}</p> : null}
@@ -181,38 +207,38 @@ export function SettingsModal({ open, preferences, onSave, onClose }: SettingsMo
 
         <SettingsGroup title={label.obsidian} description={label.obsidianHint}>
           <SettingRow label={label.enableObsidian}>
-            <Switch checked={draft.obsidian.enableObsidianExport} onChange={(checked) => setDraft({ ...draft, obsidian: { ...draft.obsidian, enableObsidianExport: checked } })} />
+            <Switch checked={draft.obsidian.enableObsidianExport} onChange={(checked) => updateDraft({ ...draft, obsidian: { ...draft.obsidian, enableObsidianExport: checked } })} />
           </SettingRow>
           <SettingRow label={label.openAfterCreate}>
-            <Switch checked={draft.obsidian.openAfterCreate} onChange={(checked) => setDraft({ ...draft, obsidian: { ...draft.obsidian, openAfterCreate: checked } })} />
+            <Switch checked={draft.obsidian.openAfterCreate} onChange={(checked) => updateDraft({ ...draft, obsidian: { ...draft.obsidian, openAfterCreate: checked } })} />
           </SettingRow>
           <SettingRow label={label.vault}>
-            <input className="input h-9 w-[260px] py-1.5" value={draft.obsidian.vault} placeholder="My Vault" onChange={(event) => setDraft({ ...draft, obsidian: { ...draft.obsidian, vault: event.target.value } })} />
+            <input className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.obsidian.vault} placeholder="My Vault" onChange={(event) => updateDraft({ ...draft, obsidian: { ...draft.obsidian, vault: event.target.value } })} />
           </SettingRow>
           <SettingRow label={label.folder}>
-            <input className="input h-9 w-[260px] py-1.5" value={draft.obsidian.folder} placeholder="TextLingo" onChange={(event) => setDraft({ ...draft, obsidian: { ...draft.obsidian, folder: event.target.value } })} />
+            <input className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.obsidian.folder} placeholder="TextLingo" onChange={(event) => updateDraft({ ...draft, obsidian: { ...draft.obsidian, folder: event.target.value } })} />
           </SettingRow>
           <SettingRow label={label.fileTemplate}>
-            <input className="input h-9 w-[300px] py-1.5" value={draft.obsidian.fileNameTemplate} placeholder="{{date}} - {{title}}" onChange={(event) => setDraft({ ...draft, obsidian: { ...draft.obsidian, fileNameTemplate: event.target.value } })} />
+            <input className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.obsidian.fileNameTemplate} placeholder="{{date}} - {{title}}" onChange={(event) => updateDraft({ ...draft, obsidian: { ...draft.obsidian, fileNameTemplate: event.target.value } })} />
           </SettingRow>
         </SettingsGroup>
 
         <SettingsGroup title={label.ocr} description={label.ocrHint}>
           <SettingRow label={label.enableOcr}>
-            <Switch checked={draft.ocr.enableOcr} onChange={(checked) => setDraft({ ...draft, ocr: { ...draft.ocr, enableOcr: checked } })} />
+            <Switch checked={draft.ocr.enableOcr} onChange={(checked) => updateDraft({ ...draft, ocr: { ...draft.ocr, enableOcr: checked } })} />
           </SettingRow>
           <SettingRow label={label.ocrProvider}>
-            <select className="input h-9 w-[260px] py-1.5" value={draft.ocr.provider} onChange={(event) => setDraft({ ...draft, ocr: { ...draft.ocr, provider: event.target.value as AppPreferences['ocr']['provider'] } })}>
+            <select className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.ocr.provider} onChange={(event) => updateDraft({ ...draft, ocr: { ...draft.ocr, provider: event.target.value as AppPreferences['ocr']['provider'] } })}>
               <option value="qwen-vl">Qwen OCR / Qwen-VL</option>
               <option value="openai">OpenAI-compatible vision</option>
               <option value="custom">Custom vision endpoint</option>
             </select>
           </SettingRow>
           <SettingRow label={label.ocrModel}>
-            <input className="input h-9 w-[260px] py-1.5" value={draft.ocr.model} placeholder="qwen-vl-ocr-latest" onChange={(event) => setDraft({ ...draft, ocr: { ...draft.ocr, model: event.target.value } })} />
+            <input className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.ocr.model} placeholder="qwen-vl-ocr-latest" onChange={(event) => updateDraft({ ...draft, ocr: { ...draft.ocr, model: event.target.value } })} />
           </SettingRow>
           <SettingRow label={label.ocrBaseUrl}>
-            <input className="input h-9 w-[300px] py-1.5" value={draft.ocr.baseUrl ?? ''} placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" onChange={(event) => setDraft({ ...draft, ocr: { ...draft.ocr, baseUrl: event.target.value } })} />
+            <input className={`input h-9 ${controlWidthClass} py-1.5`} value={draft.ocr.baseUrl ?? ''} placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" onChange={(event) => updateDraft({ ...draft, ocr: { ...draft.ocr, baseUrl: event.target.value } })} />
           </SettingRow>
         </SettingsGroup>
 

@@ -6,6 +6,7 @@ export type MarkdownExportStyle = 'obsidian';
 
 export type OcrProvider = 'qwen-vl' | 'openai' | 'custom';
 export type UiLanguage = 'zh' | 'en';
+export type AppearanceMode = 'light' | 'dark' | 'system';
 
 export interface AnalysisRequest {
   text: string;
@@ -135,7 +136,7 @@ export interface AppPreferences {
   recordHistory: boolean;
   markdownExportStyle: MarkdownExportStyle;
   uiLanguage: UiLanguage;
-  darkMode: boolean;
+  appearanceMode: AppearanceMode;
   enableDifficultyRating: boolean;
   knowledgeDetailLevel: KnowledgeDetailLevel;
   quizQuestionTypes: QuizQuestionTypes;

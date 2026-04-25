@@ -99,9 +99,20 @@ export default function App() {
   const [inputError, setInputError] = useState('');
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', preferences.darkMode);
-    writeThemeState(preferences.darkMode);
-  }, [preferences.darkMode]);
+    const systemQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyAppearance = () => {
+      const isDark = preferences.appearanceMode === 'dark' || (preferences.appearanceMode === 'system' && systemQuery.matches);
+      document.documentElement.classList.toggle('dark', isDark);
+      writeThemeState(isDark);
+    };
+
+    applyAppearance();
+
+    if (preferences.appearanceMode !== 'system') return;
+
+    systemQuery.addEventListener('change', applyAppearance);
+    return () => systemQuery.removeEventListener('change', applyAppearance);
+  }, [preferences.appearanceMode]);
 
   useEffect(() => {
     writeWorkspaceText(text);
