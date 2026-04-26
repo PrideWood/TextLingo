@@ -207,7 +207,7 @@ export function HeroInput({
   return (
     <section className="pt-8 text-center md:pt-14">
       <div className="mx-auto flex justify-center">
-        <img src="/textlingo-logo.png" alt="TextLingo logo" className="h-auto w-full max-w-[360px] md:max-w-[460px]" />
+        <img src="/textlingo-logo.png" alt="TextLingo logo" className="h-auto w-full max-w-[360px] border-t-[50px] border-t-transparent" />
       </div>
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-zinc-500 dark:text-zinc-400">{textLabel.tagline}</p>
 
