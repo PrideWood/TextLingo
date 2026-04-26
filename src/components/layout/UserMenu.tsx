@@ -14,6 +14,7 @@ export function UserMenu({ markdown }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
 
   const clearCloseTimer = () => {
@@ -48,8 +49,13 @@ export function UserMenu({ markdown }: UserMenuProps) {
 
   const copyMarkdown = async () => {
     if (!markdown) return;
+    setCopyFailed(false);
     const ok = await copyTextToClipboard(markdown);
-    if (!ok) return;
+    if (!ok) {
+      setCopyFailed(true);
+      window.setTimeout(() => setCopyFailed(false), 2000);
+      return;
+    }
     setCopied(true);
     setOpen(false);
     window.setTimeout(() => setCopied(false), 1500);
@@ -90,7 +96,7 @@ export function UserMenu({ markdown }: UserMenuProps) {
           </button>
           <button className="menu-item w-full" onClick={copyMarkdown} disabled={!markdown}>
             <ClipboardCopy size={16} />
-            {copied ? 'Copied Markdown' : 'Copy Markdown'}
+            {copyFailed ? 'Copy failed' : copied ? 'Copied Markdown' : 'Copy Markdown'}
           </button>
           <button className="menu-item w-full" disabled>
             <LogIn size={16} />

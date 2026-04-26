@@ -2,7 +2,7 @@ export interface ObsidianNewNoteParams {
   vault: string;
   folder?: string;
   fileName: string;
-  content: string;
+  content?: string;
 }
 
 export interface ObsidianTemplateData {
@@ -17,8 +17,8 @@ export function buildObsidianNewNoteUri(params: ObsidianNewNoteParams) {
   const query = [
     `vault=${encodeURIComponent(params.vault)}`,
     `file=${encodeURIComponent(filePath)}`,
-    `content=${encodeURIComponent(params.content)}`,
-  ].join('&');
+    params.content ? `content=${encodeURIComponent(params.content)}` : '',
+  ].filter(Boolean).join('&');
 
   return `obsidian://new?${query}`;
 }
@@ -47,7 +47,12 @@ export function applyObsidianFileNameTemplate(template: string, data: ObsidianTe
 
 export function openObsidianUri(uri: string, openAfterCreate = true) {
   if (!openAfterCreate) return;
-  window.location.href = uri;
+  const link = document.createElement('a');
+  link.href = uri;
+  link.rel = 'noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function formatDate(date: Date) {

@@ -1,8 +1,8 @@
 'use client';
 
 import { ClipboardCopy, Copy, FileSymlink } from 'lucide-react';
-import { useState } from 'react';
-import { copyTextToClipboard } from '../../../lib/clipboard';
+import { useRef, useState } from 'react';
+import { copyTextToClipboard, selectElementText } from '../../../lib/clipboard';
 import {
   applyObsidianFileNameTemplate,
   buildObsidianNewNoteUri,
@@ -26,6 +26,7 @@ export function ExportPage({ title, markdown, translation, knowledge, quiz, uiLa
   const [copyError, setCopyError] = useState('');
   const [obsidianStatus, setObsidianStatus] = useState('');
   const [obsidianError, setObsidianError] = useState('');
+  const markdownPreviewRef = useRef<HTMLPreElement | null>(null);
   const preferences = readPreferences();
   const label = {
     copied: uiLanguage === 'zh' ? '已复制' : 'Copied',
@@ -34,22 +35,31 @@ export function ExportPage({ title, markdown, translation, knowledge, quiz, uiLa
     copyKnowledge: uiLanguage === 'zh' ? '复制知识点' : 'Copy learning points',
     copyQuiz: uiLanguage === 'zh' ? '复制练习题' : 'Copy quiz',
     obsidian: uiLanguage === 'zh' ? '发送到 Obsidian' : 'Send to Obsidian',
+    copyFallback: uiLanguage === 'zh' ? '复制失败，已选中右侧 Markdown，可直接按快捷键复制。' : 'Copy failed. The Markdown preview is selected; use the keyboard shortcut to copy.',
+    obsidianCopiedFallback: uiLanguage === 'zh' ? 'Markdown 已复制。内容较长，将打开 Obsidian 笔记后请直接粘贴正文。' : 'Markdown copied. The note is long; paste the content after Obsidian opens.',
+    obsidianCopyFailedFallback: uiLanguage === 'zh' ? '内容较长，已尝试打开 Obsidian；右侧 Markdown 已选中，请复制后粘贴。' : 'The note is long; Obsidian was opened and the Markdown preview is selected for manual copy.',
+    obsidianCopied: uiLanguage === 'zh' ? 'Markdown 已复制，并已尝试打开 Obsidian。' : 'Markdown copied and Obsidian was opened.',
+    obsidianOpened: uiLanguage === 'zh' ? '已尝试打开 Obsidian。' : 'Tried to open Obsidian.',
   };
 
   const copy = async (key: string, value: string) => {
     setCopyError('');
     const copied = await copyTextToClipboard(value);
     if (!copied) {
-      setCopyError(uiLanguage === 'zh' ? '复制失败，请手动选择文本复制。' : 'Copy failed. Please select and copy manually.');
+      if (key === 'all') {
+        selectElementText(markdownPreviewRef.current);
+      }
+      setCopyError(key === 'all' ? label.copyFallback : uiLanguage === 'zh' ? '复制失败，请手动选择文本复制。' : 'Copy failed. Please select and copy manually.');
       return;
     }
     setCopiedKey(key);
     window.setTimeout(() => setCopiedKey(null), 1500);
   };
 
-  const sendToObsidian = () => {
+  const sendToObsidian = async () => {
     setObsidianError('');
     setObsidianStatus('');
+    setCopyError('');
 
     if (!preferences.obsidian.enableObsidianExport) {
       setObsidianError(uiLanguage === 'zh' ? '请先在设置中开启 Obsidian 导出。' : 'Enable Obsidian export in Settings first.');
@@ -62,20 +72,31 @@ export function ExportPage({ title, markdown, translation, knowledge, quiz, uiLa
     }
 
     const fileName = applyObsidianFileNameTemplate(preferences.obsidian.fileNameTemplate, { title });
-    const uri = buildObsidianNewNoteUri({
+    const uriWithContent = buildObsidianNewNoteUri({
       vault: preferences.obsidian.vault.trim(),
       folder: preferences.obsidian.folder,
       fileName,
       content: markdown,
     });
+    const copied = await copyTextToClipboard(markdown);
 
-    if (uri.length > 1800) {
-      setObsidianStatus(uiLanguage === 'zh' ? '当前内容较长，Obsidian URI 可能失败；复制 Markdown 是更稳定的备选。' : 'This note is long; Obsidian URI may fail. Copy Markdown is the safer fallback.');
+    if (uriWithContent.length > 1800) {
+      const uriWithoutContent = buildObsidianNewNoteUri({
+        vault: preferences.obsidian.vault.trim(),
+        folder: preferences.obsidian.folder,
+        fileName,
+      });
+
+      if (!copied) {
+        selectElementText(markdownPreviewRef.current);
+      }
+
+      setObsidianStatus(copied ? label.obsidianCopiedFallback : label.obsidianCopyFailedFallback);
+      openObsidianUri(uriWithoutContent, preferences.obsidian.openAfterCreate);
     } else {
-      setObsidianStatus(uiLanguage === 'zh' ? '已尝试打开 Obsidian。' : 'Tried to open Obsidian.');
+      setObsidianStatus(copied ? label.obsidianCopied : label.obsidianOpened);
+      openObsidianUri(uriWithContent, preferences.obsidian.openAfterCreate);
     }
-
-    openObsidianUri(uri, preferences.obsidian.openAfterCreate);
   };
 
   return (
@@ -84,7 +105,7 @@ export function ExportPage({ title, markdown, translation, knowledge, quiz, uiLa
         <CopyButton label={label.copyAll} copiedLabel={label.copied} copied={copiedKey === 'all'} onClick={() => copy('all', markdown)} primary />
         <button
           className="btn-secondary w-full"
-          onClick={sendToObsidian}
+          onClick={() => void sendToObsidian()}
           title={preferences.obsidian.enableObsidianExport ? label.obsidian : uiLanguage === 'zh' ? '请先在设置中开启 Obsidian 导出' : 'Enable Obsidian export in Settings'}
         >
           <FileSymlink size={16} />
@@ -117,7 +138,7 @@ export function ExportPage({ title, markdown, translation, knowledge, quiz, uiLa
       </aside>
 
       <section className="min-h-0 overflow-y-auto rounded-md border border-black/10 bg-[#444444] p-4 text-sm leading-7 text-zinc-100 dark:border-white/10">
-        <pre className="whitespace-pre-wrap break-words font-mono">{markdown}</pre>
+        <pre ref={markdownPreviewRef} className="whitespace-pre-wrap break-words font-mono">{markdown}</pre>
       </section>
     </div>
   );
