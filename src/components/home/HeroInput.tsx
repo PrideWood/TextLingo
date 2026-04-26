@@ -2,8 +2,8 @@
 
 import { Image, Loader2, Settings, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ClipboardEvent } from 'react';
-import { fetchWithAccess, isAccessUnauthorizedError } from '../../../lib/client/api';
-import type { ApiResponse, AppPreferences, UiLanguage } from '../../types';
+import { fetchWithAccess, isAccessUnauthorizedError, readApiResponse } from '../../../lib/client/api';
+import type { AppPreferences, UiLanguage } from '../../types';
 import { SettingsModal } from './SettingsModal';
 
 interface HeroInputProps {
@@ -31,6 +31,7 @@ interface PendingImage {
 }
 
 const maxImageSize = 10 * 1024 * 1024;
+const maxPendingImages = 10;
 const supportedImageTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 export function HeroInput({
@@ -50,8 +51,10 @@ export function HeroInput({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [ocrStatus, setOcrStatus] = useState('');
   const [ocrError, setOcrError] = useState('');
-  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
+  const isRecognizing = ocrStatus.startsWith(uiLanguage === 'zh' ? '正在识别文字...' : 'Recognizing text...');
   const textLabel = {
     tagline:
       uiLanguage === 'zh'
@@ -73,13 +76,16 @@ export function HeroInput({
     ocrFailed: uiLanguage === 'zh' ? 'OCR 识别失败' : 'OCR failed',
     unsupportedImage: uiLanguage === 'zh' ? '图片格式不支持，请上传 png、jpg、jpeg 或 webp。' : 'Unsupported image format. Use png, jpg, jpeg, or webp.',
     imageTooLarge: uiLanguage === 'zh' ? '图片不能超过 10MB。' : 'Image must be under 10MB.',
+    tooManyImages: uiLanguage === 'zh' ? `一次最多上传 ${maxPendingImages} 张图片。` : `Upload up to ${maxPendingImages} images at a time.`,
   };
 
+  useEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  }, [pendingImages]);
+
   useEffect(() => () => {
-    if (pendingImage) {
-      URL.revokeObjectURL(pendingImage.previewUrl);
-    }
-  }, [pendingImage]);
+    pendingImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+  }, []);
 
   const startOcr = () => {
     if (!preferences.ocr.enableOcr) {
@@ -90,45 +96,69 @@ export function HeroInput({
     fileInputRef.current?.click();
   };
 
-  const attachImage = (file: File | undefined) => {
-    if (!file) return;
+  const attachImages = (files: File[]) => {
+    if (!files.length) return;
 
-    if (!supportedImageTypes.has(file.type)) {
-      setOcrError(textLabel.unsupportedImage);
-      return;
+    const validImages: PendingImage[] = [];
+    let nextError = '';
+
+    for (const file of files) {
+      if (!supportedImageTypes.has(file.type)) {
+        nextError = textLabel.unsupportedImage;
+        continue;
+      }
+
+      if (file.size > maxImageSize) {
+        nextError = textLabel.imageTooLarge;
+        continue;
+      }
+
+      validImages.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name || 'clipboard-image'}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
     }
 
-    if (file.size > maxImageSize) {
-      setOcrError(textLabel.imageTooLarge);
+    if (!validImages.length) {
+      setOcrError(nextError);
       return;
     }
 
     setOcrError('');
     setOcrStatus('');
-    const previewUrl = URL.createObjectURL(file);
-    setPendingImage((current) => {
-      if (current) {
-        URL.revokeObjectURL(current.previewUrl);
+    setPendingImages((current) => {
+      const slots = Math.max(maxPendingImages - current.length, 0);
+      const accepted = validImages.slice(0, slots);
+      const rejected = validImages.slice(slots);
+
+      rejected.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+
+      if (rejected.length > 0 || nextError) {
+        setOcrError(rejected.length > 0 ? textLabel.tooManyImages : nextError);
       }
 
-      return {
-        id: `${Date.now()}-${file.name || 'clipboard-image'}`,
-        file,
-        previewUrl,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      };
+      return [...current, ...accepted];
     });
   };
 
-  const removePendingImage = () => {
-    setPendingImage((current) => {
-      if (current) {
-        URL.revokeObjectURL(current.previewUrl);
-      }
+  const removePendingImage = (id: string) => {
+    setPendingImages((current) => {
+      const removed = current.find((image) => image.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((image) => image.id !== id);
+    });
+    setOcrError('');
+    setOcrStatus('');
+  };
 
-      return null;
+  const clearPendingImages = () => {
+    setPendingImages((current) => {
+      current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+      return [];
     });
     setOcrError('');
     setOcrStatus('');
@@ -150,13 +180,10 @@ export function HeroInput({
       method: 'POST',
       body: formData,
     });
-    const json = (await response.json().catch(() => null)) as ApiResponse<{ text: string }> | null;
+    const json = await readApiResponse<{ text: string }>(response, textLabel.ocrFailed);
 
-    if (!json || typeof json.ok !== 'boolean') {
-      throw new Error(textLabel.ocrFormatError);
-    }
     if (!json.ok) {
-        throw new Error(json.error || textLabel.ocrFailed);
+      throw new Error(json.error || textLabel.ocrFailed);
     }
 
     return json.data.text.trim();
@@ -167,24 +194,34 @@ export function HeroInput({
     const file = imageItem?.getAsFile();
 
     if (file) {
-      attachImage(file);
+      attachImages([file]);
     }
   };
 
   const analyzeWithPendingImage = async () => {
-    if (!pendingImage) {
+    if (!pendingImages.length) {
       onAnalyze(text);
       return;
     }
 
-    setOcrStatus(textLabel.recognizing);
     setOcrError('');
 
     try {
-      const ocrText = await recognizeImage(pendingImage.file);
+      const ocrTexts: string[] = [];
+
+      for (let index = 0; index < pendingImages.length; index += 1) {
+        setOcrStatus(
+          pendingImages.length > 1
+            ? `${textLabel.recognizing} ${index + 1}/${pendingImages.length}`
+            : textLabel.recognizing,
+        );
+        ocrTexts.push(await recognizeImage(pendingImages[index].file));
+      }
+
+      const ocrText = mergeOcrTexts(ocrTexts);
       const finalText = [text.trim(), ocrText].filter(Boolean).join('\n\n');
       setText(finalText);
-      removePendingImage();
+      clearPendingImages();
       setOcrStatus('');
       onAnalyze(finalText);
     } catch (error) {
@@ -200,7 +237,7 @@ export function HeroInput({
   };
 
   const clearInput = () => {
-    removePendingImage();
+    clearPendingImages();
     onClear();
   };
 
@@ -219,26 +256,30 @@ export function HeroInput({
           onChange={(event) => setText(event.target.value)}
           onPaste={handlePaste}
         />
-        {pendingImage ? (
-          <div className="mx-2 mb-3 flex max-w-sm items-center gap-3 rounded-lg border border-black/10 bg-zinc-50 p-2 dark:border-white/10 dark:bg-zinc-950">
-            <img src={pendingImage.previewUrl} alt={pendingImage.name || 'Pasted image'} className="h-16 w-16 rounded-md object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-                {pendingImage.name || 'Clipboard image'}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {(pendingImage.size / 1024 / 1024).toFixed(2)} MB · {textLabel.pendingImage}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-              aria-label={textLabel.removeImage}
-              title={textLabel.removeImage}
-              onClick={removePendingImage}
-            >
-              <X size={15} />
-            </button>
+        {pendingImages.length ? (
+          <div className="mx-2 mb-3 grid gap-2 sm:grid-cols-2">
+            {pendingImages.map((pendingImage) => (
+              <div key={pendingImage.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-black/10 bg-zinc-50 p-2 dark:border-white/10 dark:bg-zinc-950">
+                <img src={pendingImage.previewUrl} alt={pendingImage.name || 'Pasted image'} className="h-16 w-16 rounded-md object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                    {pendingImage.name || 'Clipboard image'}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    {(pendingImage.size / 1024 / 1024).toFixed(2)} MB · {textLabel.pendingImage}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  aria-label={textLabel.removeImage}
+                  title={textLabel.removeImage}
+                  onClick={() => removePendingImage(pendingImage.id)}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
           </div>
         ) : null}
         <div className="flex flex-col gap-3 border-t border-black/10 px-2 pb-1 pt-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
@@ -258,7 +299,7 @@ export function HeroInput({
               aria-label={preferences.ocr.enableOcr ? textLabel.image : textLabel.enableOcr}
               title={preferences.ocr.enableOcr ? textLabel.image : textLabel.enableOcr}
               type="button"
-              disabled={ocrStatus === textLabel.recognizing}
+              disabled={isRecognizing}
             >
               <Image size={17} />
             </button>
@@ -266,9 +307,10 @@ export function HeroInput({
               ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
+              multiple
               className="hidden"
               onChange={(event) => {
-                attachImage(event.target.files?.[0]);
+                attachImages(Array.from(event.target.files ?? []));
                 if (fileInputRef.current) {
                   fileInputRef.current.value = '';
                 }
@@ -281,8 +323,8 @@ export function HeroInput({
               <Trash2 size={16} />
               {textLabel.clear}
             </button>
-            <button className="btn-primary min-h-10 px-4 py-2" onClick={analyzeWithPendingImage} disabled={!text.trim() && !pendingImage}>
-              {ocrStatus === textLabel.recognizing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            <button className="btn-primary min-h-10 px-4 py-2" onClick={analyzeWithPendingImage} disabled={!text.trim() && !pendingImages.length}>
+              {isRecognizing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
               {textLabel.analyze}
             </button>
           </div>
@@ -301,4 +343,11 @@ export function HeroInput({
       />
     </section>
   );
+}
+
+function mergeOcrTexts(values: string[]) {
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join('\n\n');
 }

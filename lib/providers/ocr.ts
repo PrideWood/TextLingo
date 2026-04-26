@@ -190,7 +190,7 @@ function normalizeSourceLanguage(sourceLanguage?: Language | string): Language |
 function describeLanguageScripts(language: Language) {
   switch (language) {
     case 'Japanese':
-      return 'Japanese kanji, hiragana, katakana, Japanese punctuation, and any embedded Latin letters or numbers';
+      return 'Japanese kanji, hiragana, katakana, furigana or small reading aids, Japanese punctuation, and any embedded Latin letters or numbers';
     case 'Chinese':
       return 'Chinese characters, Chinese punctuation, and any embedded Latin letters or numbers';
     case 'French':

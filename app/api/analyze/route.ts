@@ -3,7 +3,7 @@ import { analyzeText, hasAnalyzeCredentials } from '../../../lib/providers/analy
 import { requireAccess } from '../../../lib/server/access';
 import type { AnalysisResult, ApiResponse } from '../../../src/types';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET() {
   return NextResponse.json<ApiResponse<{ configured: boolean }>>({

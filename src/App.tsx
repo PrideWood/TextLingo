@@ -2,7 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { fetchWithAccess, isAccessUnauthorizedError } from '../lib/client/api';
+import { fetchWithAccess, isAccessUnauthorizedError, readApiResponse, shouldRetryApiError, shouldRetryApiResponse } from '../lib/client/api';
 import { recordLearningActivity } from '../lib/storage/progress';
 import { readPreferences, writePreferences } from '../lib/storage/preferences';
 import { clearRecentStudies, deleteRecentStudy, readRecentStudies, saveRecentStudy } from '../lib/storage/recent';
@@ -15,7 +15,6 @@ import type {
   AnalysisRequest,
   AnalysisResult,
   AnalysisState,
-  ApiResponse,
 } from './types';
 import type { RecentStudyRecord } from './types/recent';
 
@@ -28,8 +27,6 @@ interface CurrentStudyContext {
 }
 
 async function postApi<T>(endpoint: string, payload: AnalysisRequest): Promise<T> {
-  let response: Response;
-
   if (process.env.NODE_ENV === 'development') {
     console.log('[client:analyze] sending payload', {
       endpoint,
@@ -41,42 +38,59 @@ async function postApi<T>(endpoint: string, payload: AnalysisRequest): Promise<T
     });
   }
 
-  try {
-    response = await fetchWithAccess(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch (error) {
-    if (isAccessUnauthorizedError(error)) {
-      throw error;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let response: Response;
+
+    try {
+      response = await fetchWithAccess(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      if (isAccessUnauthorizedError(error)) {
+        throw error;
+      }
+
+      if (attempt === 0) {
+        await wait(700);
+        continue;
+      }
+
+      throw new Error('服务请求失败');
     }
 
-    throw new Error('服务请求失败');
+    const json = await readApiResponse<T>(response, '分析服务请求失败');
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[client:analyze] received response shape', {
+        endpoint,
+        status: response.status,
+        ok: json.ok,
+        hasData: Boolean('data' in json && json.data),
+        dataKeys: 'data' in json && json.data && typeof json.data === 'object' ? Object.keys(json.data) : [],
+        error: 'error' in json ? json.error : undefined,
+        attempt: attempt + 1,
+      });
+    }
+
+    if (!json.ok) {
+      if (attempt === 0 && (shouldRetryApiResponse(response) || shouldRetryApiError(json.error))) {
+        await wait(700);
+        continue;
+      }
+
+      throw new Error(json.error || '分析服务请求失败');
+    }
+
+    return json.data;
   }
 
-  const json = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+  throw new Error('分析服务请求失败');
+}
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[client:analyze] received response shape', {
-      endpoint,
-      status: response.status,
-      ok: json?.ok,
-      hasData: Boolean(json && 'data' in json && json.data),
-      dataKeys: json && 'data' in json && json.data && typeof json.data === 'object' ? Object.keys(json.data) : [],
-      error: json && 'error' in json ? json.error : undefined,
-    });
-  }
-
-  if (!json || typeof json !== 'object' || typeof json.ok !== 'boolean') {
-    throw new Error(`服务返回了非标准 JSON 结构（${endpoint}）`);
-  }
-
-  if (!json.ok) {
-    throw new Error(json.error || '服务请求失败');
-  }
-
-  return json.data;
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export default function App() {
